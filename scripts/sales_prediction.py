@@ -11,7 +11,6 @@ from sklearn.preprocessing import OneHotEncoder, MaxAbsScaler
 from scipy.sparse import hstack
 
 from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT
-#from matplotlib.backends.backend_qt5agg import FigureCanvasQTagg as figure
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -27,7 +26,7 @@ class MainWindow(QWidget):
     def __init__(self, graph_data):
         super().__init__()
         self.setWindowTitle("Video Game Sales Predictor")
-        self.setMinimumWidth(800)
+        self.setMinimumWidth(1400)
         self.setMinimumHeight(800)
 
         # Create a layout for the window.
@@ -78,22 +77,7 @@ class MainWindow(QWidget):
         self.prediction_output = QLineEdit()
         self.prediction_output.setReadOnly(True)
 
-        # Let user pick which axis to graph
-        self.graphlabel = QLabel("Pick Category for x-axis:")
-        self.xlabel = QComboBox()
-        self.xlabel.addItem('Genre', genres)
-        self.xlabel.addItem('Platform', platforms)
-        # addItems() in update_xlabel() does not like publishers for some reason
-        # exclude for now
-        # self.xlabel.addItem('Publisher', publishers)
-        
-        # Let user pick which subcategory to graph
-        self.xaxis = QComboBox()
-        self.xlabel.currentIndexChanged.connect(self.update_xlabel)
-        self.update_xlabel(self.xlabel.currentIndex())
-
-        # Create a chart to display the prediction.
-        # Testing chart creation atm...
+        # Let user create a graph with dataset
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
@@ -101,13 +85,26 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.toolbar)
         self.layout.addWidget(self.canvas)
 
-        # These are test plots, plot #3 is in def predict()
-        self.axs = self.fig.subplots(1, 2)
-        Wii = graph_data[graph_data['Platform'] == 'Wii']
-        self.axs[0].plot(Wii.Year, Wii.Global_Sales, 'c.', markersize = 1)
-        self.axs[1].plot('Year', 'Global_Sales', 'c.', data=graph_data)
+        self.axs = self.fig.subplots(1, 3)
+
+        # Create our own graph to compare
+        sales = graph_data['Global_Sales']
+        year = graph_data['Year']        
+        self.axs[0].scatter(year, sales)
+        self.axs[0].set_title("Global Sales per Year")
         self.canvas.draw()
 
+        # Let user pick x-axis to graph
+        self.graphlabel = QLabel("Graph sales per year depending on selectino:")
+        self.xlabel = QComboBox()
+        self.xlabel.addItem('Genre', genres)
+        self.xlabel.addItem('Platform', platforms)
+        self.xaxis = QComboBox()
+        # Changes combobox options, then updates the graph
+        self.xlabel.currentIndexChanged.connect(self.update_xlabel)
+        self.update_xlabel(self.xlabel.currentIndex())
+        self.xaxis.currentIndexChanged.connect(self.update_chart)
+        
         self.layout.addWidget(self.title_label)
         self.layout.addWidget(self.title_input)
         self.layout.addWidget(self.year_label)
@@ -128,13 +125,26 @@ class MainWindow(QWidget):
 
         self.setLayout(self.layout)
 
-
     def update_xlabel(self, index):
         self.xaxis.clear()
         sub_categories = self.xlabel.itemData(index)
         if any(sub_categories):
             self.xaxis.addItems(sub_categories)
         self.xaxis.model().sort(0)
+        self.update_chart()
+
+    def update_chart(self):
+        source = "data/vgsales.csv"
+        data = pd.read_csv(source)
+        xLabel = self.xlabel.currentText()
+        xString = self.xaxis.currentText()
+        # Platform or Genre == Wii/PSP/Sports/Shooter/etc...
+        cord = data[data[xLabel] == xString]
+        # Find Global Sales for that subcategory
+        self.axs[1].clear()
+        self.plt = self.axs[1].scatter(cord['Year'], cord['Global_Sales'])
+        self.axs[1].set_title(xString + " Sales per Year")
+        self.canvas.draw()
 
     def predict(self):
         title = self.title_input.text()
@@ -172,7 +182,8 @@ class MainWindow(QWidget):
         color_set = random.choice([ 'b', 'g', 'r', 'm', 'y' ])
         style = '{}.'.format(color_set)
         
-        self.axs[1].plot('Year', 'Global_Sales', style, data=new_data)
+        self.axs[2].plot('Year', 'Global_Sales', style, data=new_data)
+        self.axs[2].set_title("Predicted Sales")
         self.canvas.draw()
 
 def main():
